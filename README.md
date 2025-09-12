@@ -71,7 +71,7 @@ This empowers healthcare professionals to **save time, reduce uncertainty, and b
 3. **Run the Streamlit App**
 
    ```bash
-   streamlit run app.py
+   streamlit run main_app.py
    ```
 
 ## Contributing
