@@ -172,78 +172,107 @@ def home_page():
             if not query.strip():
                 st.warning("Please enter a question.")
             else:
-                client = get_chroma_client()
-                collection = get_or_create_collection(client, COLLECTION_NAME)
-                embedder = get_embedder()
-                groq_client = get_groq_client()
-
-                with st.spinner("🧩 Embedding query..."):
-                    q_emb = embedder.encode([query])[0]
-                with st.spinner("📚 Retrieving from vector store..."):
-                    results = collection.query(
-                        query_embeddings=[q_emb.tolist()],
-                        n_results=RAG_N_RESULTS,
-                        include=["documents", "metadatas", "distances"]
-                    )
-                docs = results.get("documents", [[]])[0]
-                metas = results.get("metadatas", [[]])[0]
-                dists = results.get("distances", [[]])[0] if "distances" in results else [None] * len(docs)
-
-                # ✅ Check if any data exists in vector DB
                 try:
-                    if collection.count() == 0:
+                    client = get_chroma_client()
+                    collection = get_or_create_collection(client, COLLECTION_NAME)
+                    embedder = get_embedder()
+                    groq_client = get_groq_client()
+
+                    with st.spinner("🧩 Embedding query..."):
+                        q_emb = embedder.encode([query])[0]
+                    with st.spinner("📚 Retrieving from vector store..."):
+                        results = collection.query(
+                            query_embeddings=[q_emb.tolist()],
+                            n_results=RAG_N_RESULTS,
+                            include=["documents", "metadatas", "distances"]
+                        )
+                    docs = results.get("documents", [[]])[0]
+                    metas = results.get("metadatas", [[]])[0]
+                    dists = results.get("distances", [[]])[0] if "distances" in results else [None] * len(docs)
+
+                    # ✅ Check if any data exists in vector DB
+                    try:
+                        if collection.count() == 0:
+                            st.info(
+                                "ℹ️ No data found in vector database. Please go to **Search Articles** page, search for articles and ingest them first.")
+                            return
+                    except Exception:
                         st.info(
                             "ℹ️ No data found in vector database. Please go to **Search Articles** page, search for articles and ingest them first.")
                         return
-                except Exception:
-                    st.info(
-                        "ℹ️ No data found in vector database. Please go to **Search Articles** page, search for articles and ingest them first.")
-                    return
 
-                # --- RAG Answer before Retrieved documents ---
-                if groq_client:
-                    context_parts, total_chars = [], 0
-                    for meta, doc in zip(metas, docs):
-                        excerpt = doc[:PER_DOC_CHAR_LIMIT]
-                        block = f"PMID: {meta.get('pmid', '')}\nTitle: {meta.get('title', '')}\nJournal: {meta.get('journal', '')}\nDate: {meta.get('publication_date', '')}\n\n{excerpt}\n\n"
-                        if total_chars + len(block) > TOTAL_CHAR_LIMIT:
-                            break
-                        context_parts.append(block)
-                        total_chars += len(block)
+                    # --- RAG Answer before Retrieved documents ---
+                    if groq_client:
+                        context_parts, total_chars = [], 0
+                        for meta, doc in zip(metas, docs):
+                            excerpt = doc[:PER_DOC_CHAR_LIMIT]
+                            block = f"PMID: {meta.get('pmid', '')}\nTitle: {meta.get('title', '')}\nJournal: {meta.get('journal', '')}\nDate: {meta.get('publication_date', '')}\n\n{excerpt}\n\n"
+                            if total_chars + len(block) > TOTAL_CHAR_LIMIT:
+                                break
+                            context_parts.append(block)
+                            total_chars += len(block)
 
-                    if context_parts:
-                        context_text = "\n".join(context_parts)
-                        system_msg = (
-                            "You are an evidence-based medical research assistant. Use the provided research context as primary source. Do NOT invent facts. When making a claim, cite supporting PMID(s). If evidence is insufficient, state that clearly."
-                        )
-                        user_prompt = (
-                            f"Question: {query}\n\nContext:\n{context_text}\n\nProvide a concise evidence-based answer (3-6 sentences), list PMIDs supporting each claim, and give a short confidence (High/Moderate/Low) with reason."
-                        )
-
-                        info_msg = st.info("⏳ Generating answer (may take a few seconds)...")
-                        try:
-                            messages = [
-                                ChatCompletionSystemMessageParam(role="system", content=system_msg),
-                                ChatCompletionUserMessageParam(role="user", content=user_prompt)
-                            ]
-                            chat_completion = groq_client.chat.completions.create(
-                                model=os.environ['GROQ_MODEL'],
-                                messages=messages,
-                                temperature=0.0,
-                                max_tokens=1000
+                        if context_parts:
+                            context_text = "\n".join(context_parts)
+                            system_msg = (
+                                "You are an evidence-based medical research assistant. Use the provided research context as primary source. Do NOT invent facts. When making a claim, cite supporting PMID(s). If evidence is insufficient, state that clearly."
                             )
-                            final_answer = chat_completion.choices[0].message.content.strip()
+                            user_prompt = (
+                                f"Question: {query}\n\nContext:\n{context_text}\n\nProvide a concise evidence-based answer (3-6 sentences), list PMIDs supporting each claim, and give a short confidence (High/Moderate/Low) with reason."
+                            )
 
-                            # st.subheader("🧠 Answer")
-                            # st.write(final_answer)
+                            info_msg = st.info("⏳ Generating answer (may take a few seconds)...")
+                            try:
+                                messages = [
+                                    ChatCompletionSystemMessageParam(role="system", content=system_msg),
+                                    ChatCompletionUserMessageParam(role="user", content=user_prompt)
+                                ]
+                                chat_completion = groq_client.chat.completions.create(
+                                    model=os.environ['GROQ_MODEL'],
+                                    messages=messages,
+                                    temperature=0.0,
+                                    max_tokens=1000
+                                )
+                                final_answer = chat_completion.choices[0].message.content.strip()
 
-                            # escape HTML and convert newlines to <br> for safe display
-                            safe_answer = html.escape(final_answer).replace("\n", "<br>")
+                                # st.subheader("🧠 Answer")
+                                # st.write(final_answer)
 
-                            info_msg.empty()
+                                # escape HTML and convert newlines to <br> for safe display
+                                safe_answer = html.escape(final_answer).replace("\n", "<br>")
 
-                            # show answer inside a pretty card
-                            st.markdown(f"""
+                                info_msg.empty()
+
+                                # show answer inside a pretty card
+                                st.markdown(f"""
+                                    <div style="
+                                        border:1px solid #e5e7eb;
+                                        border-radius:12px;
+                                        padding:16px 20px;
+                                        margin-bottom:20px;
+                                        background-color:#ffffff;
+                                        box-shadow:0 2px 6px rgba(0,0,0,0.05);
+                                    ">
+                                        <h4 style="margin:0; font-size:20px; color:#1e3a8a;">🧠 Answer</h4>
+                                        <div style="margin-top:2px; font-size:14px; color:#111827; line-height:1.45;">
+                                            {safe_answer}
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+
+                            except Exception as e:
+                                info_msg.empty()
+                                st.error(f"Generation failed: {e}")
+
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            # ✅ Beautiful UI for Retrieved Evidence List
+                            st.markdown(
+                                '<div style="font-size:20px; font-weight:600; margin-bottom:8px;">📄 Retrieved Evidence List from PubMed</div>',
+                                unsafe_allow_html=True
+                            )
+                            for i, (meta, doc, dist) in enumerate(zip(metas, docs, dists), start=1):
+                                sim_text = f"{dist:.2f}" if isinstance(dist, (int, float)) else "N/A"
+                                st.markdown(f"""
                                 <div style="
                                     border:1px solid #e5e7eb;
                                     border-radius:12px;
@@ -252,48 +281,23 @@ def home_page():
                                     background-color:#ffffff;
                                     box-shadow:0 2px 6px rgba(0,0,0,0.05);
                                 ">
-                                    <h4 style="margin:0; font-size:20px; color:#1e3a8a;">🧠 Answer</h4>
-                                    <div style="margin-top:2px; font-size:14px; color:#111827; line-height:1.45;">
-                                        {safe_answer}
-                                    </div>
+                                    <h4 style="margin:0; font-size:16px; color:#1e3a8a;">{i}. {meta.get("title", "No Title")}</h4>
+                                    <p style="margin:1px 0; font-size:13px; color:#374151;">
+                                        📖 <b>Journal:</b> {meta.get("journal", "")} &nbsp;|&nbsp; <b>Year:</b> {meta.get("publication_date", "")}
+                                    </p>
+                                    <p style="margin:6px 0; font-size:13px; color:#4b5563;">
+                                        🔑 <b>PMID:</b> {meta.get("pmid", "")} &nbsp;|&nbsp; 🎯 <b>Similarity:</b> {sim_text}
+                                    </p>
+                                    <details style="margin:8px 0; font-size:13px;">
+                                        <summary style="cursor:pointer; color:#2563eb;">📖 Preview abstract</summary>
+                                        <p style="margin-top:6px; color:#111827;">{doc[:4000]}</p>
+                                    </details>
                                 </div>
                                 """, unsafe_allow_html=True)
-
-                        except Exception as e:
-                            info_msg.empty()
-                            st.error(f"Generation failed: {e}")
-
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        # ✅ Beautiful UI for Retrieved Evidence List
-                        st.markdown(
-                            '<div style="font-size:20px; font-weight:600; margin-bottom:8px;">📄 Retrieved Evidence List from PubMed</div>',
-                            unsafe_allow_html=True
-                        )
-                        for i, (meta, doc, dist) in enumerate(zip(metas, docs, dists), start=1):
-                            sim_text = f"{dist:.2f}" if isinstance(dist, (int, float)) else "N/A"
-                            st.markdown(f"""
-                            <div style="
-                                border:1px solid #e5e7eb;
-                                border-radius:12px;
-                                padding:16px 20px;
-                                margin-bottom:20px;
-                                background-color:#ffffff;
-                                box-shadow:0 2px 6px rgba(0,0,0,0.05);
-                            ">
-                                <h4 style="margin:0; font-size:16px; color:#1e3a8a;">{i}. {meta.get("title", "No Title")}</h4>
-                                <p style="margin:1px 0; font-size:13px; color:#374151;">
-                                    📖 <b>Journal:</b> {meta.get("journal", "")} &nbsp;|&nbsp; <b>Year:</b> {meta.get("publication_date", "")}
-                                </p>
-                                <p style="margin:6px 0; font-size:13px; color:#4b5563;">
-                                    🔑 <b>PMID:</b> {meta.get("pmid", "")} &nbsp;|&nbsp; 🎯 <b>Similarity:</b> {sim_text}
-                                </p>
-                                <details style="margin:8px 0; font-size:13px;">
-                                    <summary style="cursor:pointer; color:#2563eb;">📖 Preview abstract</summary>
-                                    <p style="margin-top:6px; color:#111827;">{doc[:4000]}</p>
-                                </details>
-                            </div>
-                            """, unsafe_allow_html=True)
-
+                except Exception as e:
+                    st.error(f"❌ Query handling failed: {type(e).__name__}: {e}")
+                    st.session_state.ask_in_progress = False
+                return
         st.session_state.ask_in_progress = False
 
 
