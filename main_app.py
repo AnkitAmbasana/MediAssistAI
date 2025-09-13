@@ -173,39 +173,25 @@ def home_page():
                 st.warning("Please enter a question.")
             else:
                 try:
-                    st.info("🔎 Step 1: Getting Chroma client...")
                     client = get_chroma_client()
-
-                    st.info("🔎 Step 2: Getting/creating collection...")
                     collection = get_or_create_collection(client, COLLECTION_NAME)
-
-                    st.info("🔎 Step 3: Loading embedder...")
                     embedder = get_embedder()
-
-                    st.info("🔎 Step 4: Loading Groq client...")
                     groq_client = get_groq_client()
-
-                    st.info("🔎 Step 5: Encoding query...")
 
                     with st.spinner("🧩 Embedding query..."):
                         q_emb = embedder.encode([query])[0]
-
-                    st.info("🔎 Step 6: Querying Chroma...")
                     with st.spinner("📚 Retrieving from vector store..."):
                         results = collection.query(
                             query_embeddings=[q_emb.tolist()],
                             n_results=RAG_N_RESULTS,
                             include=["documents", "metadatas", "distances"]
                         )
-
-                    st.info("✅ Step 7: Processing results...")
                     docs = results.get("documents", [[]])[0]
                     metas = results.get("metadatas", [[]])[0]
                     dists = results.get("distances", [[]])[0] if "distances" in results else [None] * len(docs)
 
                     # ✅ Check if any data exists in vector DB
                     try:
-                        st.info("✅ Step 8: Checking if DB has data...")
                         if collection.count() == 0:
                             st.info(
                                 "ℹ️ No data found in vector database. Please go to **Search Articles** page, search for articles and ingest them first.")
@@ -216,9 +202,7 @@ def home_page():
                         return
 
                     # --- RAG Answer before Retrieved documents ---
-                    st.info("✅ Step 9: groq_client  STEP 1")
                     if groq_client:
-                        st.info("✅ Step 9: groq_client STEP 2")
                         context_parts, total_chars = [], 0
                         for meta, doc in zip(metas, docs):
                             excerpt = doc[:PER_DOC_CHAR_LIMIT]
@@ -228,9 +212,7 @@ def home_page():
                             context_parts.append(block)
                             total_chars += len(block)
 
-                        st.info("✅ Step 9: groq_client STEP 3")
                         if context_parts:
-                            st.info("✅ Step 9: groq_client STEP 4")
                             context_text = "\n".join(context_parts)
                             system_msg = (
                                 "You are an evidence-based medical research assistant. Use the provided research context as primary source. Do NOT invent facts. When making a claim, cite supporting PMID(s). If evidence is insufficient, state that clearly."
@@ -239,7 +221,6 @@ def home_page():
                                 f"Question: {query}\n\nContext:\n{context_text}\n\nProvide a concise evidence-based answer (3-6 sentences), list PMIDs supporting each claim, and give a short confidence (High/Moderate/Low) with reason."
                             )
 
-                            st.info("✅ Step 9: groq_client STEP 5")
                             info_msg = st.info("⏳ Generating answer (may take a few seconds)...")
                             try:
                                 messages = [
@@ -260,7 +241,6 @@ def home_page():
                                 # escape HTML and convert newlines to <br> for safe display
                                 safe_answer = html.escape(final_answer).replace("\n", "<br>")
 
-                                st.info("✅ Step 9: groq_client STEP 6")
                                 info_msg.empty()
 
                                 # show answer inside a pretty card
@@ -280,21 +260,16 @@ def home_page():
                                     </div>
                                     """, unsafe_allow_html=True)
 
-                                st.info("✅ Step 9: groq_client STEP 7")
                             except Exception as e:
-                                st.info(f"✅ Step 9: groq_client STEP 8 ERROR: {e}")
                                 info_msg.empty()
                                 st.error(f"Generation failed: {e}")
 
-                            st.info("✅ Step 9: groq_client STEP 9")
                             st.markdown("<br>", unsafe_allow_html=True)
                             # ✅ Beautiful UI for Retrieved Evidence List
                             st.markdown(
                                 '<div style="font-size:20px; font-weight:600; margin-bottom:8px;">📄 Retrieved Evidence List from PubMed</div>',
                                 unsafe_allow_html=True
                             )
-
-                            st.info("✅ Step 9: groq_client STEP 10")
                             for i, (meta, doc, dist) in enumerate(zip(metas, docs, dists), start=1):
                                 sim_text = f"{dist:.2f}" if isinstance(dist, (int, float)) else "N/A"
                                 st.markdown(f"""
@@ -319,10 +294,7 @@ def home_page():
                                     </details>
                                 </div>
                                 """, unsafe_allow_html=True)
-
-                            st.info("✅ Step 9: groq_client STEP 11")
                 except Exception as e:
-                    st.info(f"✅ Step 9: groq_client STEP 12 error: {e}")
                     st.error(f"❌ Query handling failed: {type(e).__name__}: {e}")
                     st.session_state.ask_in_progress = False
                 return
