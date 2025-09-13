@@ -52,6 +52,15 @@ This empowers healthcare professionals to **save time, reduce uncertainty, and b
 
 ---
 
+## 🚀 Launch App
+[https://mediassist-genai.streamlit.app/](https://mediassist-genai.streamlit.app/)
+
+![app](Project%20Screenshot%201.png)
+
+---
+![app](Project%20Screenshot%202.png)
+
+---
 
 ### Installation Steps
 
