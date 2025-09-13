@@ -144,6 +144,10 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 st.markdown("<div style='margin-top:6px; margin-bottom:6px;'></div>", unsafe_allow_html=True)
 
+client = get_chroma_client()
+collection = get_or_create_collection(client, COLLECTION_NAME)
+embedder = get_embedder()
+groq_client = get_groq_client()
 
 # ---------------------------
 # Home Page
@@ -167,10 +171,6 @@ def home_page():
         if not query.strip():
             st.warning("Please enter a question.")
         else:
-            client = get_chroma_client()
-            collection = get_or_create_collection(client, COLLECTION_NAME)
-            embedder = get_embedder()
-            groq_client = get_groq_client()
 
             with st.spinner("🧩 Embedding query..."):
                 q_emb = embedder.encode([query])[0]
@@ -319,10 +319,10 @@ def search_articles_page():
 
     # --- Input controls row ---
     with st.container():
-        client = get_chroma_client()
-        collection = get_or_create_collection(client, COLLECTION_NAME)
-        embedder = get_embedder()
-        groq_client = get_groq_client()
+        # client = get_chroma_client()
+        # collection = get_or_create_collection(client, COLLECTION_NAME)
+        # embedder = get_embedder()
+        # groq_client = get_groq_client()
 
         col1, col2 = st.columns([6, 2])
         with col1:
