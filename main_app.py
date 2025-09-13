@@ -1,4 +1,12 @@
 import sys
+
+# Patch sqlite3 for ChromaDB compatibility
+try:
+    import pysqlite3  # type: ignore
+    sys.modules["sqlite3"] = sys.modules["pysqlite3"]
+except ImportError:
+    pass
+
 import os
 import time
 import streamlit as st
@@ -8,13 +16,6 @@ import chromadb
 from pubmed import PubMedRetriever
 import html
 import tempfile
-
-# Patch sqlite3 for ChromaDB compatibility
-try:
-    import pysqlite3  # type: ignore
-    sys.modules["sqlite3"] = sys.modules["pysqlite3"]
-except ImportError:
-    pass
 
 try:
     from groq import Groq
