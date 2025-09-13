@@ -50,7 +50,12 @@ TOTAL_CHAR_LIMIT = 20000
 @st.cache_resource
 def get_chroma_client(path: str = CHROMA_DIR):
     os.makedirs(path, exist_ok=True)
-    return chromadb.PersistentClient(path=path)
+    if hasattr(chromadb, "PersistentClient"):
+        return chromadb.PersistentClient(path=path)
+    elif hasattr(chromadb, "EphemeralClient"):
+        return chromadb.EphemeralClient()
+    else:
+        raise ImportError("Your ChromaDB version does not support PersistentClient or EphemeralClient.")
 
 @st.cache_resource
 def get_embedder(model_name: str = DEFAULT_MODEL):
