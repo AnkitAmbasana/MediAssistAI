@@ -7,6 +7,7 @@ from sentence_transformers import SentenceTransformer
 import chromadb
 from pubmed import PubMedRetriever
 import html
+import tempfile
 
 # Patch sqlite3 for ChromaDB compatibility
 try:
@@ -33,7 +34,8 @@ st.set_page_config(page_title="Healthcare Research Assistant", page_icon="🩺",
 # Configuration
 # ---------------------------
 COLLECTION_NAME = "pubmed_if_articles"
-CHROMA_DIR = "./chroma_data"
+# CHROMA_DIR = "./chroma_data"
+CHROMA_DIR = os.path.join(tempfile.gettempdir(), "chroma_data")
 DEFAULT_MODEL = "pritamdeka/S-PubMedBert-MS-MARCO"
 SEARCH_DEFAULT = "intermittent fasting and diabetes"
 MAX_SEARCH = 200
@@ -47,6 +49,7 @@ TOTAL_CHAR_LIMIT = 20000
 # ---------------------------
 @st.cache_resource
 def get_chroma_client(path: str = CHROMA_DIR):
+    os.makedirs(path, exist_ok=True)
     return chromadb.PersistentClient(path=path)
 
 @st.cache_resource
